@@ -3,8 +3,10 @@
 
     <!-- 查询和其他操作 -->
     <div class="filter-container">
-      <el-input v-model="listQuery.userId" clearable class="filter-item" style="width: 200px;" placeholder="请输入用户ID" />
-      <el-input v-model="listQuery.orderSn" clearable class="filter-item" style="width: 200px;" placeholder="请输入订单编号" />
+      <el-input v-model="listQuery.userId" clearable class="filter-item" style="width: 160px;" placeholder="请输入用户ID" />
+      <el-input v-model="listQuery.orderId" clearable class="filter-item" style="width: 160px;" placeholder="请输入订单ID" />
+      <el-input v-model="listQuery.orderSn" clearable class="filter-item" style="width: 160px;" placeholder="请输入订单编号" />
+      <el-date-picker v-model="listQuery.timeArray" type="datetimerange" value-format="yyyy-MM-dd HH:mm:ss" class="filter-item" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" :picker-options="pickerOptions" />
       <el-select v-model="listQuery.orderStatusArray" multiple style="width: 200px" class="filter-item" placeholder="请选择订单状态">
         <el-option v-for="(key, value) in statusMap" :key="key" :label="key" :value="value" />
       </el-select>
@@ -35,9 +37,10 @@
 
       <el-table-column align="center" label="物流渠道" prop="shipChannel" />
 
-      <el-table-column align="center" label="操作" width="200" class-name="small-padding fixed-width">
+      <el-table-column align="center" label="操作" width="250" class-name="small-padding fixed-width">
         <template slot-scope="scope">
           <el-button v-permission="['GET /admin/order/detail']" type="primary" size="mini" @click="handleDetail(scope.row)">详情</el-button>
+          <el-button v-permission="['POST /admin/order/delete']" type="danger" size="mini" @click="handleDelete(scope.row)">删除</el-button>
           <el-button v-if="scope.row.orderStatus==201" v-permission="['POST /admin/order/ship']" type="primary" size="mini" @click="handleShip(scope.row)">发货</el-button>
           <el-button v-if="scope.row.orderStatus==202||scope.row.orderStatus==204" v-permission="['POST /admin/order/refund']" type="primary" size="mini" @click="handleRefund(scope.row)">退款</el-button>
         </template>
@@ -151,7 +154,7 @@
 </template>
 
 <script>
-import { detailOrder, listOrder, listChannel, refundOrder, shipOrder } from '@/api/order'
+import { detailOrder, listOrder, listChannel, refundOrder, deleteOrder, shipOrder } from '@/api/order'
 import Pagination from '@/components/Pagination' // Secondary package based on el-pagination
 import checkPermission from '@/utils/permission' // 权限判断函数
 
@@ -159,11 +162,9 @@ const statusMap = {
   101: '未付款',
   102: '用户取消',
   103: '系统取消',
-  200: '已付款团购',
   201: '已付款',
   202: '申请退款',
   203: '已退款',
-  204: '已超时团购',
   301: '已发货',
   401: '用户收货',
   402: '系统收货'
@@ -187,9 +188,38 @@ export default {
         limit: 20,
         id: undefined,
         name: undefined,
+        timeArray: [],
         orderStatusArray: [],
         sort: 'add_time',
-        order: 'desc'
+        order: 'desc',
+        orderId:undefined
+      },
+      pickerOptions: {
+        shortcuts: [{
+          text: '最近一周',
+          onClick(picker) {
+            const end = new Date()
+            const start = new Date()
+            start.setTime(start.getTime() - 3600 * 1000 * 24 * 7)
+            picker.$emit('pick', [start, end])
+          }
+        }, {
+          text: '最近一个月',
+          onClick(picker) {
+            const end = new Date()
+            const start = new Date()
+            start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
+            picker.$emit('pick', [start, end])
+          }
+        }, {
+          text: '最近三个月',
+          onClick(picker) {
+            const end = new Date()
+            const start = new Date()
+            start.setTime(start.getTime() - 3600 * 1000 * 24 * 90)
+            picker.$emit('pick', [start, end])
+          }
+        }]
       },
       statusMap,
       orderDialogVisible: false,
@@ -221,15 +251,37 @@ export default {
     checkPermission,
     getList() {
       this.listLoading = true
-      listOrder(this.listQuery).then(response => {
-        this.list = response.data.data.list
-        this.total = response.data.data.total
-        this.listLoading = false
-      }).catch(() => {
-        this.list = []
-        this.total = 0
-        this.listLoading = false
-      })
+      if (this.listQuery.timeArray && this.listQuery.timeArray.length === 2) {
+        this.listQuery.start = this.listQuery.timeArray[0]
+        this.listQuery.end = this.listQuery.timeArray[1]
+      } else {
+        this.listQuery.start = null
+        this.listQuery.end = null
+      }
+      if(this.listQuery.orderId){
+        detailOrder(this.listQuery.orderId).then(response => {
+          this.list = [];
+          if(response.data.data.order){
+            this.list.push(response.data.data.order);
+            this.total = 1;
+            this.listLoading = false
+          }
+        }).catch(() => {
+          this.list = []
+          this.total = 0
+          this.listLoading = false
+        })
+      }else{
+        listOrder(this.listQuery).then(response => {
+          this.list = response.data.data.list
+          this.total = response.data.data.total
+          this.listLoading = false
+        }).catch(() => {
+          this.list = []
+          this.total = 0
+          this.listLoading = false
+        })
+      }
     },
     getChannel() {
       listChannel().then(response => {
@@ -273,6 +325,20 @@ export default {
             })
           })
         }
+      })
+    },
+    handleDelete(row) {
+      deleteOrder({ orderId: row.id }).then(response => {
+        this.$notify.success({
+          title: '成功',
+          message: '订单删除成功'
+        })
+        this.getList()
+      }).catch(response => {
+        this.$notify.error({
+          title: '失败',
+          message: response.data.errmsg
+        })
       })
     },
     handleRefund(row) {

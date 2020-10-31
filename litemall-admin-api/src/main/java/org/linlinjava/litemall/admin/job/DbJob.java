@@ -2,12 +2,7 @@ package org.linlinjava.litemall.admin.job;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.linlinjava.litemall.core.system.SystemConfig;
-import org.linlinjava.litemall.db.domain.LitemallOrder;
-import org.linlinjava.litemall.db.domain.LitemallOrderGoods;
-import org.linlinjava.litemall.db.service.*;
 import org.linlinjava.litemall.db.util.DbUtil;
-import org.linlinjava.litemall.db.util.OrderUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,8 +11,6 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * 数据库定时备份任务
@@ -45,7 +38,7 @@ public class DbJob {
         String db = url.substring(index1+5, index2);
 
         LocalDate localDate = LocalDate.now();
-        String fileName = localDate.toString();
+        String fileName = localDate.toString() + ".sql";
         File file = new File("backup", fileName);
         file.getParentFile().mkdirs();
         file.createNewFile();
@@ -54,8 +47,11 @@ public class DbJob {
         DbUtil.backup(file, user, password, db);
         // 删除七天前数据库备份文件
         LocalDate before = localDate.minusDays(7);
-        File fileBefore = new File("backup", fileName);
-        fileBefore.deleteOnExit();
+        String fileBeforeName = before.toString()+".sql";
+        File fileBefore = new File("backup", fileBeforeName);
+        if (fileBefore.exists()) {
+            fileBefore.delete();
+        }
 
         logger.info("系统结束定时任务数据库备份");
     }

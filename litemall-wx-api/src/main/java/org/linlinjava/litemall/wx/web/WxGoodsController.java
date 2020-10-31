@@ -1,7 +1,6 @@
 package org.linlinjava.litemall.wx.web;
 
 import com.github.pagehelper.PageInfo;
-import com.mysql.jdbc.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.linlinjava.litemall.core.system.SystemConfig;
@@ -12,6 +11,7 @@ import org.linlinjava.litemall.db.domain.*;
 import org.linlinjava.litemall.db.service.*;
 import org.linlinjava.litemall.wx.annotation.LoginUser;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -128,6 +128,7 @@ public class WxGoodsController {
 				c.put("id", comment.getId());
 				c.put("addTime", comment.getAddTime());
 				c.put("content", comment.getContent());
+				c.put("adminContent", comment.getAdminContent());
 				LitemallUser user = userService.findById(comment.getUserId());
 				c.put("nickname", user == null ? "" : user.getNickname());
 				c.put("avatar", user == null ? "" : user.getAvatar());
@@ -258,7 +259,7 @@ public class WxGoodsController {
 		@Order @RequestParam(defaultValue = "desc") String order) {
 
 		//添加到搜索历史
-		if (userId != null && !StringUtils.isNullOrEmpty(keyword)) {
+		if (userId != null && !StringUtils.isEmpty(keyword)) {
 			LitemallSearchHistory searchHistoryVo = new LitemallSearchHistory();
 			searchHistoryVo.setKeyword(keyword);
 			searchHistoryVo.setUserId(userId);
